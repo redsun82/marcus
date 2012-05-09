@@ -24,9 +24,8 @@ DEFAULT_CONFIG = {
 
 INDENT_COLS = 2
 INDENTS = {' ' : 1, '\t' : 8}
-LOREM_CFG_FILE = 'loremc.cfg'
 
-""" decorator for cli options """
+""" decorator for li options """
 class option :
     def __init__(self, longopt, shortopt=None, description=None, arg=True):
         self.longopt = longopt
@@ -202,6 +201,7 @@ class CompileConfig :
         self.__dict__.update(kargs)
         append_preamble('%(container)s = %(container)s || {};' % self, self)
         self.open_files = []
+        self.errors = []
     def __getitem__(self, item) :
         return self.__dict__[item]
     def __getattr__(self, name) :
@@ -694,6 +694,9 @@ class Comment(AST) :
     def js_compile (self, cfg) :
         cfg.send('// ' + self.text)
 
+register_token('CFGOPTION', 'compile option', None, Comment)
+
+
 """ wrapper for lists of AST nodes """
 class Block(AST) :
     def __init__(self, stmts=None) :
@@ -790,8 +793,17 @@ def tokenize (cfg) :
                 col += INDENTS[l[i]]
             else : break
         if l[i] in ['\r','\n'] : continue # empty line
-        if l[i:i+1] == '##' : # comment
-            yield Token('COMMENT', text = l[i+1:], line=ln_no)
+        if l[i:i+2] == '##' : # comment
+            if l[i+2:i+3] == '-' : # cfg option, execute immediately
+                m = l[i+2:].split(None, 1)
+                try :
+                    opt_lookup[m[0]](m[1] if len(m) > 1 else None, cfg)
+                except (KeyError, Usage) :
+                    cfg.syntax_error(line=ln_no,
+                                     err= "Bad config option")
+                yield Token('CFGOPTION', text = l[i+2:], line=ln_no)
+            else :
+                yield Token('COMMENT', text = l[i+2:], line=ln_no)
             continue
         if col > indents[-1] :
             yield Token('INDENT', line=ln_no)
@@ -936,11 +948,6 @@ def main (argv=None):
     prog_name = argv[0]
     cfg = CompileConfig()
     try :
-        try :
-            load_cfg_file(LOREM_CFG_FILE, cfg)
-        except IOError :
-            cfg = CompileConfig()
-            pass
         try :
             opts, arg = getopt.getopt(argv[1:], short_opts, long_opts)
         except getopt.error, msg :
