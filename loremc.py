@@ -1,5 +1,26 @@
 #!/usr/bin/python
 
+# Copyright (c) 2012 Paolo Tranquilli
+
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 import sys, re, getopt, os.path, shutil, itertools
 from collections import OrderedDict as odict, deque
 
@@ -128,7 +149,14 @@ def change_to_drop_array (x, cfg) : cfg.to_drops = x
 @option('container', 'c',
         'Change the container in which directives will be defined',
         default=DEFAULT_CONFIG['container'])
-def change_output (x, cfg) : cfg.container = x
+def change_container (x, cfg) : cfg.container = x
+
+@option('copy-direction', None,
+        'Change the default direction of copy and repeat statements (^ or _)',
+        default=DEFAULT_CONFIG['default_direction'])
+def change_default_direction (x, cfg) :
+    if x not in ['^', '_'] : raise Usage("Copy direction must be '^' or '_'")
+    cfg.default_direction = x
 
 @option('output', 'o', 'Change the output file name '
         '(use %i for input without extension)',
@@ -202,8 +230,14 @@ def load_cfg_file (x, cfg):
 @option('closure-ready', None,
         "With 1, try to prevent closure compiler from renaming properties in "
         "js parts of the code. With 0, disable this feature", default='0')
-def reset_cfg (x, cfg):
+def set_closure_ready (x, cfg):
     switch_option('closure-ready', 'closure_ready', x, cfg)
+
+@option('keep-repeated', None,
+        "With 1, always keep copied node after repeat loops. With 0 "
+        "the copied node is dropeed", default='0')
+def set_keep_repeated (x, cfg):
+    switch_option('keep-repeated', 'keep_repeated', x, cfg)
 
 @option('help', 'h', "Show this help and do nothing", arg=False)
 def show_help (x, cfg) :
@@ -246,7 +280,7 @@ Options ('*' marks ones with argument):
                 self.output_msg += ("%*sDefault: %s\n" %
                                     (opt_heading_max + 3, '', default))
         if msg :
-            self.output_msg += msg + '\n'
+            self.output_msg += '\n' + msg + '\n'
 
 
 """ CLASSES """
@@ -756,7 +790,7 @@ class Loop(AST) :
         end_block(cfg)
         if self.obj : end_block(cfg)
         # if repeating, mark root for erasure
-        if self.rep : drop_root(cfg)
+        if self.rep and not cfg.keep_repeated : drop_root(cfg)
         # process else body, based on pos
         if self.else_body :
             cfg.send('if (!%(ind)s) {' % cfg)
