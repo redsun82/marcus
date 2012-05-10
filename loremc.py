@@ -256,7 +256,6 @@ class Compiler :
         self.__dict__ = dict(DEFAULT_CONFIG)
         self.root = self.default_root
         self.__dict__.update(kargs)
-        append_preamble('%(container)s = %(container)s || {};' % self, self)
         self.open_files = []
         self.errors = []
 
@@ -530,6 +529,10 @@ def begin_select(cfg, obj, saves=None) :
                 obj.n = obj.n[:-1] or '0'
             else :
                 obj.fail_silently = False
+            if obj.n[0] == '{' :
+                fresh = cfg.fresh()
+                cfg.send('var %s = %s;' % (fresh, obj.n[1:-1]))
+                obj.n = fresh
             # if n ends with '?' at most one, otherwise n is the index
             cfg.send('%(root)s = %%s[%%s];' % cfg %
                      (cfg.selector(cfg.root, obj.sel), obj.n))
@@ -570,7 +573,8 @@ def selector_str (obj) :
         return '%s%s' % (obj.n + ' ' if obj.n else '', obj.sel)
     else : return ''
 
-selector_regexp = r'(?:%s(?:(?P<n>[0-9]+|@|\?|\+):\s*)?(?P<sel>\S.*?))'
+selector_regexp = \
+    r'(?:%s(?:(?P<n>(?:[0-9]+|\{.*?\})\??|@|\?):\s*)?(?P<sel>\S.*?))'
 
 
 """ DECORATORS """
