@@ -180,9 +180,7 @@ def turn_on_lazy_parsing (x, cfg):
     switch_option('lazy-parsing', 'lazy_parsing', x, cfg)
 
 @option('selection-mode', 's',
-        "Choose the default selection mode: @ for all, a number n for "
-        "nth (starting from 0), n? for nth if it exists (? is equivalent "
-        "to 0?)", default='@')
+        "Choose the default selection mode", default='@')
 def change_sel_mode (x, cfg): cfg.default_sel_mode = x
 
 @option('reset-cfg', 'E',
@@ -208,7 +206,7 @@ def reset_cfg (x, cfg):
 
 @option('help', 'h', "Show this help and do nothing", arg=False)
 def show_help (x, cfg) :
-    raise Usage()
+    raise Usage(out=sys.stdout)
 
 
 """ ERRORS """
@@ -229,11 +227,13 @@ def column_str (s, whitespace, max_len=79) :
                         column_str(s[max_len:], whitespace, max_len))
 
 class Usage(Exception) :
-    def __init__(self, msg=None) :
+    def __init__(self, msg=None, out=sys.stderr) :
         self.msg = msg
+        self.out = out
         self.output_msg = \
 """
 Usage : %s [OPTIONS] input1 [input2 ...]
+
 Options ('*' marks ones with argument):
 """  % os.path.split(prog_name)[1]
         for opt, arg_descr in sorted(opt_descr.items()) :
@@ -1037,7 +1037,7 @@ def main (argv=None):
             if n != 0 : return n
         return 0
     except Usage, err :
-        print >>sys.stderr, err.output_msg
+        print >>err.out, err.output_msg
         return 2
     except LoremSyntaxError as e :
         print >>sys.stderr, "Syntax error at line", e.line
