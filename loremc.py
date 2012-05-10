@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import sys, re, getopt, os.path, shutil, itertools
+from collections import OrderedDict as odict, deque
 
 DEFAULT_CONFIG = {
     "lang" : 'js',
@@ -25,13 +26,17 @@ DEFAULT_CONFIG = {
 INDENT_COLS = 2
 INDENTS = {' ' : 1, '\t' : 8}
 
-""" decorator for li options """
+""" OPTIONS """
+
+""" decorator for cli options """
 class option :
-    def __init__(self, longopt, shortopt=None, description=None, arg=True):
+    def __init__(self, longopt, shortopt=None, description='<no description>',
+                 arg=True, default=None):
         self.longopt = longopt
         self.shortopt = shortopt
         self.description = description
         self.arg = arg
+        self.default = default
     def __call__(self, f) :
         global opt_heading_max, short_opts
         if '--' + self.longopt in opt_lookup :
@@ -43,11 +48,10 @@ class option :
                 raise ValueError('option ' + self.shortopt + ' already defined')
             opt_lookup['-' + self.shortopt] = f
             short_opts += self.shortopt + (':' if self.arg else '')
-        if self.description :
-            heading = '--' + self.longopt
-            heading += ', -' + self.shortopt if self.shortopt else ''
-            opt_heading_max = max(len(heading), opt_heading_max)
-            opt_descr[heading] = self.arg, self.description
+        heading = '--' + self.longopt
+        heading += ', -' + self.shortopt if self.shortopt else ''
+        opt_heading_max = max(len(heading), opt_heading_max)
+        opt_descr[heading] = self.arg, self.description + '.', self.default
         return f
 
 short_opts = ""
@@ -57,21 +61,26 @@ opt_descr = {}
 opt_heading_max = 0
 
 
-@option('temp-prefix', 't', 'Change the prefix of temporary variables')
+@option('temp-prefix', 't', 'Change the prefix of temporary variables',
+        default=DEFAULT_CONFIG['tmp_prefix'])
 def change_temp_prefix (x, cfg) : cfg.tmp_prefix = x
 
-@option('default-root', 'r', 'Change the default root variable')
+@option('default-root', 'r', 'Change the default root variable',
+        default=DEFAULT_CONFIG['default_root'])
 def change_default_root (x, cfg) : cfg.default_root = x
 
 @option('old-content-var', 'O',
-        'Change the variable holding previous contents in DOM assignments')
+        'Change the variable holding previous contents in DOM assignments',
+        default=DEFAULT_CONFIG['old'])
 def change_temp_prefix (x, cfg) : cfg.old = x
 
-@option('index-var', 'i', 'Change the position variable')
+@option('index-var', 'i', 'Change the position variable',
+        default=DEFAULT_CONFIG['ind'])
 def change_index_var (x, cfg) : cfg.ind = x
 
 @option('query-selector', 'q',
-        'Change the selector macro (use %r for root, %s for selector')
+        'Change the selector macro (use %r for root, %s for selector',
+        default='%r.querySelectorAll(%s)')
 def change_query_selector (x, cfg) :
     x = x.replace('%r', '%(r)s')
     x = x.replace('%s', '%(s)s')
@@ -107,19 +116,23 @@ def prepend_preamble_file (x, cfg) :
     preamble = itertools.chain(x, cfg.preamble)
 
 @option('to-drop-field', None,
-        'Change the field name used for marking removal')
+        'Change the field name used for marking removal',
+        default=DEFAULT_CONFIG['to_drop'])
 def change_to_drop_field (x, cfg) : cfg.to_drop = x
 
 @option('to-drop-array', None,
-        'Change the name used for the array marking removal')
+        'Change the name used for the array marking removal',
+        default=DEFAULT_CONFIG['to_drops'])
 def change_to_drop_array (x, cfg) : cfg.to_drops = x
 
 @option('container', 'c',
-        'Change the container in which directives will be defined')
+        'Change the container in which directives will be defined',
+        default=DEFAULT_CONFIG['container'])
 def change_output (x, cfg) : cfg.container = x
 
 @option('output', 'o', 'Change the output file name '
- '(use %i for input without extension)')
+        '(use %i for input without extension)',
+        default='%i')
 def change_output (x, cfg) :
     cfg.output_format = x
 
@@ -142,23 +155,34 @@ def format_output (cfg) :
     cfg.output = os.path.join(dr, '.'.join(bs))
 
 @option('post-process', 'e',
-        "Command to be executed after compilation (use '%c' "
+        "Add a command to be executed after compilation (use '%c' "
         "for compiled file)")
 def change_post_process (x, cfg): cfg.post_process.append(x)
 
+def switch_option(opt, field, x, cfg) :
+    if x == '1' :
+        cfg.__dict__[field] = True
+    elif x == '0' :
+        cfg.__dict__[field] = False
+    else :
+        raise Usage("Argument for '%s' must be 0 or 1" % opt)
+
 @option('weak-parsing', 'w',
-        "Turn on weak parsing (unrecognized lines are directly passed to "
-        "compiled code)", arg=False)
-def turn_on_weak_parsing (x, cfg): cfg.weak_parsing = True
+        "Enable (1) or disable (0) weak parsing, where unrecognized lines are "
+        "directly passed to compiled code", default='0')
+def turn_on_weak_parsing (x, cfg):
+    switch_option('weak-parsing', 'weak_parsing', x, cfg)
 
 @option('lazy-parsing', 'l',
-        "Turn on lazy parsing (stop at first error)", arg=False)
-def turn_on_lazy_parsing (x, cfg): cfg.lazy_parsing = True
+        "Enable (1) or disable (0) lazy parsing (stop at first error)",
+        default='0')
+def turn_on_lazy_parsing (x, cfg):
+    switch_option('lazy-parsing', 'lazy_parsing', x, cfg)
 
 @option('selection-mode', 's',
         "Choose the default selection mode: @ for all, a number n for "
         "nth (starting from 0), n? for nth if it exists (? is equivalent "
-        "to 0?)")
+        "to 0?)", default='@')
 def change_sel_mode (x, cfg): cfg.default_sel_mode = x
 
 @option('reset-cfg', 'E',
@@ -177,24 +201,57 @@ def load_cfg_file (x, cfg):
                         (x, key))
 
 @option('closure-ready', None,
-        "Try to prevent closure compiler from renaming properties in "
-        "js parts of the code (EXPERIMENTAL)", arg=False)
-def reset_cfg (x, cfg): cfg.closure_ready = True
+        "With 1, try to prevent closure compiler from renaming properties in "
+        "js parts of the code. With 0, disable this feature", default='0')
+def reset_cfg (x, cfg):
+    switch_option('closure-ready', 'closure_ready', x, cfg)
+
+@option('help', 'h', "Show this help and do nothing", arg=False)
+def show_help (x, cfg) :
+    raise Usage()
 
 
-
-def istr(obj, indent=0, end='\n') :
-    return "%*s%s%s" % (indent * INDENT_COLS, '', strip(obj), end)
-
-def strip(obj) :
-    return str(obj).strip() if obj else ""
+""" ERRORS """
 
 class LoremSyntaxError(Exception) :
     def __init__(self, line, err) :
         self.err = err
         self.line = line
 
-class CompileConfig :
+""" Option pretty printer utility """
+def column_str (s, whitespace, max_len=79) :
+    n = max_len - whitespace
+    if len(s) <= n : return s
+    while n and s[n] != ' ' : n -= 1
+    if n : return "%s\n%*s%s" % (s[:n], whitespace, '',
+                               column_str(s[n+1:], whitespace, max_len))
+    return "%s\n%*s%s" % (s[:max_len], whitespace, '',
+                        column_str(s[max_len:], whitespace, max_len))
+
+class Usage(Exception) :
+    def __init__(self, msg=None) :
+        self.msg = msg
+        self.output_msg = \
+"""
+Usage : %s [OPTIONS] input1 [input2 ...]
+Options ('*' marks ones with argument):
+"""  % os.path.split(prog_name)[1]
+        for opt, arg_descr in sorted(opt_descr.items()) :
+            arg, descr, default = arg_descr
+            self.output_msg += ("\n%s %-*s %s\n" %
+                         ('*' if arg else ' ', opt_heading_max, opt,
+                          column_str(descr, opt_heading_max + 3)))
+            if default :
+                self.output_msg += ("%*sDefault: %s\n" %
+                                    (opt_heading_max + 3, '', default))
+        if msg :
+            self.output_msg += msg + '\n'
+
+
+""" CLASSES """
+
+""" Main acting class, holding configuration and dealing with I/O """
+class Compiler :
     def __init__(self, **kargs) :
         self.__dict__ = dict(DEFAULT_CONFIG)
         self.root = self.default_root
@@ -202,18 +259,22 @@ class CompileConfig :
         append_preamble('%(container)s = %(container)s || {};' % self, self)
         self.open_files = []
         self.errors = []
+
     def __getitem__(self, item) :
         return self.__dict__[item]
+
     def __getattr__(self, name) :
         if name[0] == '_' :
             raise AttributeError
         return None
+
     def fresh(self, n=None) :
         if n is None :
             self.tmp_counter += 1
             return self.tmp_prefix + str(self.tmp_counter)
         else :
             return tuple(self.fresh() for _ in xrange(n))
+
     def init_compilation(self) :
         self.tmp_counter = -1
         self.indent = 0
@@ -230,26 +291,33 @@ class CompileConfig :
             for l in self.preamble :
                 self.send(l)
             self.send('')
+
     def end_compilation(self) :
         for f in self.open_files :
             f.close()
         self.open_files = []
+
     def send(self, obj) :
         if obj is not None :
             self.tmp_output.write(istr(str(obj), self.indent))
+
     def sends(self, objs) :
         for obj in objs : self.send(obj)
+
     def sends_ind(self, pairs) :
         indent = self.indent
         for obj, n in pairs :
             self.indent = indent + n
             self.send(obj)
+
     def stmt_header(self, stmt) :
         self.send('// %s: %s' % (stmt.line, token_names[stmt.typ]))
+
     def open(self, f, *args, **kargs) :
         f = open(f, *args, **kargs)
         self.open_files.append(f)
         return f
+
     def close(self, f) :
         try :
             self.open_files.remove(f)
@@ -257,6 +325,7 @@ class CompileConfig :
             pass
         finally :
             return f.close()
+
     def syntax_error(self, line, err) :
         if self.lazy_parsing :
             raise LoremSyntaxError(line=line, err=err)
@@ -267,28 +336,37 @@ class Token :
     def __init__(self, typ, **kargs) :
         self.__dict__ = { x : strip(y) for x, y in kargs.items() }
         self.typ = typ
+
     def __getitem__(self, item) :
         return self.__dict__[item]
+
     def to_stmt(self) :
         return token_class[self.typ](**self.__dict__)
+
 
 class AST :
     _with_body = False
     _with_else_body = False
-    def istr(self, indent=0) :
-        return ''
-    def __str__(self) : return self.istr()
+
     def __init__(self, **kargs) :
         self.__dict__ = kargs
+
+    def istr(self, indent=0) :
+        return ''
+
+    def __str__(self) : return self.istr()
+
     def __getitem__(self, item) :
         try :
             return self.__dict__[item]
         except KeyError :
             return ''
+
     def __getattr__(self, name) :
         if name[0] == '_' :
             raise AttributeError
         return None
+
     def cont(self, s) :
         raise LoremSyntaxError(self.line,
                                'Cannot extend %s' % token_names[self.typ])
@@ -297,18 +375,34 @@ class AST :
         return {
             'js' : self.js_compile(config)
             }[config.lang]
+
     def js_compile(self, cfg) :
         return
 
-""" dummy AST node used to go on on syntax errors """
-class Error(AST) :
-    def istr(self, indent=0) :
-        return '<error %s>' % self.err
-    def cont(self, s) : pass
-    def js_compile(self, cfg) :
-        raise ValueError
 
-from collections import OrderedDict as odict
+""" Wraps a generator adding lookahead to it """
+class lookahead() :
+    def __init__(self, gen) :
+        self.gen = gen.__iter__()
+        self._buffer = deque()
+
+    def peek(self, n=0, default=None) :
+        try :
+            for _ in xrange(n + 1 - len(self._buffer)) :
+                self._buffer.append(self.gen.next())
+            return self._buffer[n]
+        except StopIteration :
+            return default
+
+    def next(self) :
+        try :
+            return self._buffer.popleft()
+        except IndexError :
+            return self.gen.next()
+
+    def __iter__(self) :
+        return self
+
 
 token_regexp = odict()
 token_class = dict()
@@ -324,6 +418,14 @@ def register_token(typ, name, regexp=None, clss=None) :
         token_class[typ] = clss
         clss.typ = typ
     token_names[typ] = name
+
+""" HELPER FUNCTIONS """
+
+def istr(obj, indent=0, end='\n') :
+    return "%*s%s%s" % (indent * INDENT_COLS, '', strip(obj), end)
+
+def strip(obj) :
+    return str(obj).strip() if obj else ""
 
 _dot_selection = re.compile('([^"\']*?)' r'(\w+\.(?:\w+(?:\.\w+)*))')
 _string_regexp = re.compile('[^"\']*?(?P<a>["\']).*?' r'(?<!\\)(?P=a)')
@@ -387,54 +489,6 @@ def make_js_selector(f) :
         f(obj, cfg, *kargs)
         end_select(cfg, frames, obj)
     return sethandler
-
-
-""" decorator for assigning tokens to AST nodes """
-class statement :
-    def __init__(self, typ, name, regexp=None) :
-        self.typ = typ
-        self.name = name
-        self.regexp = regexp
-    def __call__ (self, c) :
-        register_token(self.typ, self.name, self.regexp, c)
-        # on compile, output token line and token name as comment
-        c.js_compile = add_stmt_header(c.js_compile)
-        if c._with_body :
-            c.istr = add_istr_body(c.istr)
-            block_openers.append(self.typ)
-        if c._with_else_body :
-            c.istr = add_istr_else_body(c.istr)
-            with_else.append(self.typ)
-        return c
-
-""" decorator that adds a body to AST nodes spec """
-def with_body(c) :
-    c._with_body = True
-    return c
-
-""" decorator that adds both a body and an else body to AST nodes spec """
-def with_else_body(c) :
-    c._with_body = True
-    c._with_else_body = True
-    return c
-
-""" decorator that makes the AST node a selector """
-def selector(c) :
-    c.__init__ = make_selector_init(c.__init__)
-    c.js_compile = make_js_selector(c.js_compile)
-    return c
-
-""" decorator which tells what field to continue with extended lines """
-class extend :
-    def __init__(self, field) :
-        self.field = field
-    def __call__(self, c) :
-        def cont (obj, s) :
-            obj.__dict__[self.field] += ' ' + s;
-        c.cont = cont
-        return c
-
-# Compiler helper functions
 
 def save_frame(cfg, what) :
     fresh = cfg.fresh()
@@ -518,10 +572,70 @@ def selector_str (obj) :
 
 selector_regexp = r'(?:%s(?:(?P<n>[0-9]+|@|\?|\+):\s*)?(?P<sel>\S.*?))'
 
+
+""" DECORATORS """
+
+""" decorator for assigning tokens to AST nodes """
+class statement :
+    def __init__(self, typ, name, regexp=None) :
+        self.typ = typ
+        self.name = name
+        self.regexp = regexp
+    def __call__ (self, c) :
+        register_token(self.typ, self.name, self.regexp, c)
+        # on compile, output token line and token name as comment
+        c.js_compile = add_stmt_header(c.js_compile)
+        if c._with_body :
+            c.istr = add_istr_body(c.istr)
+            block_openers.append(self.typ)
+        if c._with_else_body :
+            c.istr = add_istr_else_body(c.istr)
+            with_else.append(self.typ)
+        return c
+
+""" decorator that adds a body to AST nodes spec """
+def with_body(c) :
+    c._with_body = True
+    return c
+
+""" decorator that adds both a body and an else body to AST nodes spec """
+def with_else_body(c) :
+    c._with_body = True
+    c._with_else_body = True
+    return c
+
+""" decorator that makes the AST node a selector """
+def selector(c) :
+    c.__init__ = make_selector_init(c.__init__)
+    c.js_compile = make_js_selector(c.js_compile)
+    return c
+
+""" decorator which tells what field to continue with extended lines """
+class extend :
+    def __init__(self, field) :
+        self.field = field
+    def __call__(self, c) :
+        def cont (obj, s) :
+            obj.__dict__[self.field] += ' ' + s;
+        c.cont = cont
+        return c
+
+""" TOKENS AND AST NODES """
+
 register_token('INDENT', 'indentation')
 register_token('DEDENT', 'deindentation')
 register_token('CONT', 'line expansion')
 register_token('ELSE', 'else', 'else')
+
+""" dummy AST node used to go on on syntax errors """
+class Error(AST) :
+    def istr(self, indent=0) :
+        return '<error %s>' % self.err
+
+    def cont(self, s) : pass
+
+    def js_compile(self, cfg) :
+        raise ValueError
 
 @statement('DROP', 'drop', 'drop' + selector_regexp % r'\s+' + '?')
 @extend('sel')
@@ -762,6 +876,8 @@ class Eval(AST) :
                                self.right[-1] not in [';', '\\']
                                else ''))
 
+""" LEXER """
+
 INDENTS = {' ' : 1, '\t' : 8}
 
 continue_re = re.compile(r'(?P<s>.*?)\\$')
@@ -789,10 +905,13 @@ def tokenize (cfg) :
             if l[i+2:i+3] == '-' : # cfg option, execute immediately
                 m = l[i+2:].split(None, 1)
                 try :
-                    opt_lookup[m[0]](m[1] if len(m) > 1 else None, cfg)
-                except (KeyError, Usage) :
+                    opt_lookup[m[0]](strip(m[1]) if len(m) > 1 else None, cfg)
+                except KeyError :
                     cfg.syntax_error(line=ln_no,
-                                     err= "Bad config option")
+                                     err= "Option '%s' not recognized" % m[0])
+                except Usage, err :
+                    cfg.syntax_error(line=ln_no,
+                                     err= "Bad option: " + err.msg)
                 yield Token('CFGOPTION', text = l[i+2:], line=ln_no)
             else :
                 yield Token('COMMENT', text = l[i+2:], line=ln_no)
@@ -826,26 +945,8 @@ def tokenize (cfg) :
                 cfg.syntax_error(line=ln_no,
                                  err="Unrecognized line: " + l.strip())
 
-from collections import deque
 
-class LookAhead() :
-    def __init__(self, gen) :
-        self.gen = gen.__iter__()
-        self.looked_ahead = deque()
-    def peek(self, n=0, default=None) :
-        try :
-            while n >= len(self.looked_ahead) :
-                self.looked_ahead.append(self.gen.next())
-            return self.looked_ahead[n]
-        except StopIteration :
-            return default
-    def next(self) :
-        try :
-            return self.looked_ahead.popleft()
-        except IndexError :
-            return self.gen.next()
-    def __iter__(self) :
-        return self
+""" PARSER """
 
 def unexpected (cfg, tk, expected=None) :
     cfg.syntax_error(
@@ -860,7 +961,7 @@ def parse_indent (tk_stream, cfg) :
         return
     tk_stream.next()
 
-""" tk_stream needs to be a LookAhead stream """
+""" tk_stream needs to be a lookahead stream """
 def parse_token_stream (tk_stream, cfg, acc=None) :
     acc = acc or Block()
     try :
@@ -894,7 +995,7 @@ def parse_token_stream (tk_stream, cfg, acc=None) :
 def compile(cfg) :
     cfg.init_compilation()
     try :
-        ast = parse_token_stream(LookAhead(tokenize(cfg)), cfg)
+        ast = parse_token_stream(lookahead(tokenize(cfg)), cfg)
         if cfg.errors :
             print >>sys.stderr, "Compilation failed!"
             for line, err in cfg.errors :
@@ -913,47 +1014,26 @@ def compile(cfg) :
         os.system(s)
     return 0
 
-def column_str (s, whitespace, max_len=79) :
-    n = max_len - whitespace
-    if len(s) <= n : return s
-    while n and s[n] != ' ' : n -= 1
-    if n : return "%s\n%*s%s" % (s[:n], whitespace, '',
-                               column_str(s[n+1:], whitespace, max_len))
-    return "%s\n%*s%s" % (s[:max_len], whitespace, '',
-                        column_str(s[max_len:], whitespace, max_len))
-class Usage(Exception) :
-    def __init__(self, msg=None) :
-        self.msg = \
-"""%s
-Usage : %s [OPTIONS] input1 [input2 ...]
-Options ('*' marks ones with argument):
-"""  % (msg or "", prog_name)
-        for opt, arg_descr in sorted(opt_descr.items()) :
-            arg, descr = arg_descr
-            self.msg += ("%s %-*s %s\n" %
-                         ('*' if arg else ' ', opt_heading_max, opt,
-                          column_str(descr, opt_heading_max + 3)))
-
 def main (argv=None):
     global prog_name
     argv = argv or sys.argv
     prog_name = argv[0]
-    cfg = CompileConfig()
+    cfg = Compiler()
     try :
         try :
             opts, arg = getopt.getopt(argv[1:], short_opts, long_opts)
         except getopt.error, msg :
             raise Usage(msg)
-        if not arg : raise Usage("You must provide at least an input.")
         for opt, opt_arg in opts :
             opt_lookup[opt](opt_arg, cfg)
+        if not arg : raise Usage("You must provide at least an input.")
         for cfg.input in arg :
             print >>sys.stdout, "Compiling", cfg.input
             n = compile(cfg)
             if n != 0 : return n
         return 0
     except Usage, err :
-        print >>sys.stderr, err.msg
+        print >>sys.stderr, err.output_msg
         return 2
     except LoremSyntaxError as e :
         print >>sys.stderr, "Syntax error at line", e.line
