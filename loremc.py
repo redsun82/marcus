@@ -193,7 +193,8 @@ def load_cfg_file (x, cfg):
         try :
             for l in f :
                 l = l.split(None, 1)
-                opt_lookup[l[0]](l[1].rstrip() if len(l) > 1 else None, cfg)
+                if l :
+                    opt_lookup[l[0]](l[1].rstrip() if len(l) > 1 else None, cfg)
         except KeyError, key :
             raise Usage(msg='Problem loading %s:\n%s option unknown' %
                         (x, key))
