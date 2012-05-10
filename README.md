@@ -1,4 +1,4 @@
-marcus-lorem-ipsum
-==================
+marcus
+======
 
-Fill yout pure html lorem ipsum templates
+Fill yout pure html lorem ipsum templates.
