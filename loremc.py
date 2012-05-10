@@ -325,14 +325,10 @@ def register_token(typ, name, regexp=None, clss=None) :
         clss.typ = typ
     token_names[typ] = name
 
-_regexp1 = re.compile(r'([^' "'" r'"]*?)(\w+\.(?:\w+(?:\.\w+)*))')
-_regexp2 = [(re.compile(r'[^"]*?' "'"),
-             re.compile(r".*?(?<!\\)'")),
-            (re.compile(r'.*?"'),
-             re.compile(r'.*?(?<!\\)"'))
-            ]
+_dot_selection = re.compile('([^"\']*?)' r'(\w+\.(?:\w+(?:\.\w+)*))')
+_string_regexp = re.compile('[^"\']*?(?P<a>["\']).*?' r'(?<!\\)(?P=a)')
 def closure_readify(l, i=0) :
-    m = _regexp1.match(l, i)
+    m = _dot_selection.match(l, i)
     if m :
         d = list((l[:i],) + m.groups())
         i += len(m.group())
@@ -340,14 +336,10 @@ def closure_readify(l, i=0) :
         d[2] = d[2][0] + ''.join('["%s"]' % x for x in d[2][1:])
         d = ''.join(d)
         return closure_readify(d + l[i:], len(d))
-    for pre, post in _regexp2 :
-        m = pre.match(l, i)
-        if m :
-            i += len(m.group())
-            m = post.match(l, i)
-            if m :
-                return closure_readify(l, i + len(m.group()))
-            return l
+    m = _string_regexp.match(l, i)
+    if m :
+        return closure_readify(l, i + len(m.group()))
+    # malformed string, leave it be
     return l
 
 """ prepend line number and token name in output to compilation"""
