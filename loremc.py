@@ -902,8 +902,8 @@ class Definition(AST) :
                 ('var %s;' % ', '.join(cfg[x] for x in cfg.vars), 1),
                 ('%(to_drops)s = new Array();' % cfg, 1),
                 ('if (typeof(%(root)s) == "string") {' % cfg, 1),
-                ('%(root)s = %%s;' % cfg % cfg.selector('document', cfg.root),
-                 2),
+                ('%(root)s = %%s;' % cfg %
+                 cfg.selector_all('document', cfg.root), 2),
                 ('for (%(ind)s = 0; %(ind)s < %(root)s.length; %(ind)s++) {' %
                  cfg, 2),
                 ('%%s(%(root)s[%(ind)s], %%s);' % cfg %
