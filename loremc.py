@@ -588,7 +588,7 @@ def begin_select(cfg, obj, saves=None) :
                          (cfg.selector_all(cfg.root, obj.sel), obj.n))
             else :
                 cfg.send('%(root)s = %%s;' % cfg %
-                         cfg.selector(cfg.root, obj.sel))
+                         cfg.selector_one(cfg.root, obj.sel))
             if obj.fail_silently :
                 cfg.send('if (%(root)s) {' % cfg)
                 cfg.indent += 1
