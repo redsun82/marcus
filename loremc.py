@@ -33,8 +33,10 @@ DEFAULT_CONFIG = {
     "ind" : 'pos',
     "to_drop" : '_lorem_drop',
     "to_drops" : '_lorem_to_drop',
-    "selector" : (lambda r, s : '%(r)s.querySelectorAll(%(s)s)' %
-                  {'r' : r, 's' : s}),
+    "selector_all" : (lambda r, s : '%(r)s.querySelectorAll(%(s)s)' %
+                      {'r' : r, 's' : s}),
+    "selector_one" : (lambda r, s : '%(r)s.querySelector(%(s)s)' %
+                      {'r' : r, 's' : s}),
     "old" : 'old',
     "preamble" : [],
     "save" : ['ind', 'root'],
@@ -101,11 +103,18 @@ def change_index_var (x, cfg) : cfg.ind = x
 
 @option('query-selector', 'q',
         'Change the selector macro (use %r for root, %s for selector',
-        default='%r.querySelectorAll(%s)')
+        default='%r.querySelector(%s)')
 def change_query_selector (x, cfg) :
     x = x.replace('%r', '%(r)s')
     x = x.replace('%s', '%(s)s')
     cfg.selector = (lambda r, s : x % {'r' : r, 's' : s})
+@option('query-selector-all', 'Q',
+        'Change the selector all macro (use %r for root, %s for selector',
+        default='%r.querySelectorAll(%s)')
+def change_query_selector_all (x, cfg) :
+    x = x.replace('%r', '%(r)s')
+    x = x.replace('%s', '%(s)s')
+    cfg.selector_all = (lambda r, s : x % {'r' : r, 's' : s})
 
 @option('preamble-from-file', 'F',
         'Load preamble from file, replacing the default')
@@ -208,8 +217,12 @@ def turn_on_lazy_parsing (x, cfg):
     switch_option('lazy-parsing', 'lazy_parsing', x, cfg)
 
 @option('selection-mode', 's',
-        "Choose the default selection mode", default='@')
-def change_sel_mode (x, cfg): cfg.default_sel_mode = x
+        "Choose the default selection mode",
+        default=DEFAULT_CONFIG["default_sel_mode"])
+def change_sel_mode (x, cfg):
+    if not re.match(sel_mod_regexp + '$', x) :
+        raise Usage('Invalid selection mode')
+    cfg.default_sel_mode = x
 
 @option('reset-cfg', 'E',
         "Forget all options", arg=False)
@@ -551,11 +564,12 @@ def end_block(cfg) :
 
 def begin_select(cfg, obj, saves=None) :
     if obj.sel :
-        obj.n = obj.n or cfg.default_sel_mode or '@'
+        obj.n = obj.n or cfg.default_sel_mode
         frames = save_frames(cfg, saves)
-        if obj.n == '@' : # select loop
+        if obj.n == 'all' : # select loop
             fresh = cfg.fresh()
-            cfg.send('var %s = %s;' % (fresh, cfg.selector(cfg.root, obj.sel)))
+            cfg.send('var %s = %s;' %
+                     (fresh, cfg.selector_all(cfg.root, obj.sel)))
             begin_loop(cfg, cfg.ind, fresh)
             cfg.send('%(root)s = %%s[%(ind)s];' % cfg % fresh)
         else :
@@ -569,8 +583,12 @@ def begin_select(cfg, obj, saves=None) :
                 cfg.send('var %s = %s;' % (fresh, obj.n[1:-1]))
                 obj.n = fresh
             # if n ends with '?' at most one, otherwise n is the index
-            cfg.send('%(root)s = %%s[%%s];' % cfg %
-                     (cfg.selector(cfg.root, obj.sel), obj.n))
+            if obj.n != '0':
+                cfg.send('%(root)s = %%s[%%s];' % cfg %
+                         (cfg.selector_all(cfg.root, obj.sel), obj.n))
+            else :
+                cfg.send('%(root)s = %%s;' % cfg %
+                         cfg.selector(cfg.root, obj.sel))
             if obj.fail_silently :
                 cfg.send('if (%(root)s) {' % cfg)
                 cfg.indent += 1
@@ -579,7 +597,7 @@ def begin_select(cfg, obj, saves=None) :
 
 def end_select(cfg, frames, obj, saves=None) :
     if obj.sel :
-        if not obj.n or obj.n == '@' or  obj.fail_silently :
+        if obj.n == 'all' or  obj.fail_silently :
             end_block(cfg)
         load_frames(cfg, frames, saves)
 
@@ -608,8 +626,10 @@ def selector_str (obj) :
         return '%s%s' % (obj.n + ' ' if obj.n else '', obj.sel)
     else : return ''
 
-selector_regexp = \
-    r'(?:%s(?:(?P<n>(?:[0-9]+|\{.*?\})\??|@|\?):\s*)?(?P<sel>\S.*?))'
+
+sel_mod_regexp = r'(?:(?:[0-9]+|\{.*?\})\??|all|\?)'
+# selector_regex expects formatting giving the beginning of the regexp
+selector_regexp = r'(?:%%s(?:(?P<n>%s):\s*)?(?P<sel>\S.*?))' % sel_mod_regexp
 
 
 """ DECORATORS """
@@ -886,7 +906,8 @@ class Definition(AST) :
                  2),
                 ('for (%(ind)s = 0; %(ind)s < %(root)s.length; %(ind)s++) {' %
                  cfg, 2),
-                ('%s(%s);' % (self.name, ', '.join(self.args)), 3),
+                ('%%s(%(root)s[%(ind)s], %%s);' % cfg %
+                 (self.name, ', '.join(self.args[1:])), 3),
                 ('}', 2),
                 ('return;', 2),
                 ('}', 1),
@@ -995,6 +1016,8 @@ def unexpected (cfg, tk, expected=None) :
          ' (was expecting %s)' % token_names[expected] if expected else ''))
 
 def parse_indent (tk_stream, cfg) :
+    while tk_stream.peek().typ == 'COMMENT' :
+        tk_stream.next()
     if tk_stream.peek().typ != 'INDENT' :
         unexpected(cfg, tk_stream.peek(), 'INDENT')
         return
@@ -1011,6 +1034,8 @@ def parse_token_stream (tk_stream, cfg, acc=None) :
         return acc
     if n.typ not in token_class :
         unexpected(cfg, n)
+        return parse_token_stream(tk_stream, cfg, acc)
+    if n.typ == 'COMMENT' :
         return parse_token_stream(tk_stream, cfg, acc)
     try :
         n = n.to_stmt() # n is incomplete for the moment
