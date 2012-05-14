@@ -21,7 +21,7 @@ examples = [
       ]
     },
     { name : "This example page",
-      files : "example_directive",
+      files : "examples_dir",
       buttons : []
     }
 ];

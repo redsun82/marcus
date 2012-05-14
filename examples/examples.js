@@ -97,7 +97,7 @@ function get_file(what, where1, where2, lines) {
                 });
 }
 
-_loaded = { example_directive : true };
+_loaded = { "examples_dir.js" : true };
 
 function load_js(what) {
     if (_loaded[what]) return;

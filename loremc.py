@@ -107,7 +107,7 @@ def change_index_var (x, cfg) : cfg.ind = x
 def change_query_selector (x, cfg) :
     x = x.replace('%r', '%(r)s')
     x = x.replace('%s', '%(s)s')
-    cfg.selector = (lambda r, s : x % {'r' : r, 's' : s})
+    cfg.selector_one = (lambda r, s : x % {'r' : r, 's' : s})
 @option('query-selector-all', 'Q',
         'Change the selector all macro (use %r for root, %s for selector',
         default='%r.querySelectorAll(%s)')
@@ -741,7 +741,7 @@ class DomAssign(AST) :
                     ])
 
 
-@statement('SELECT', 'select', 'select' + selector_regexp % r'\s+')
+@statement('SELECT', 'select', '(?:select|\$)' + selector_regexp % r'\s+')
 @extend('sel')
 @selector
 @with_body

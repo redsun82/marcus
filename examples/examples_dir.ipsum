@@ -1,8 +1,9 @@
 ##--selection-mode 0
 ##--keep-repeated 1
+##--weak-parsing 1
 
 def load_examples()
-    select select option
+    $ select option
         repeat for ex in examples
             /value := pos ? pos : ""
             := ex.name
@@ -10,17 +11,17 @@ def load_examples()
 
 
 def load_example(root, ex)
-    select #result > div
-        eval var html = root
-    select #html_code
-        eval get_file(ex.files + '.html', root, html, 'rows')
-    select .box.code textarea
-        eval get_file(ex.files + '.ipsum', root, null, 'rows')
-    select #data
-        eval get_file(ex.files + '.json', root)
-    eval load_js(ex.files + '.js')
+    $ #result > div
+        var html = root
+    $ #html_code
+        get_file(ex.files + '.html', root, html, 'rows')
+    $ .box.code textarea
+        get_file(ex.files + '.ipsum', root, null, 'rows')
+    $ #data
+        get_file(ex.files + '.json', root)
+    load_js(ex.files + '.js')
     title := ex.name
-    select .buttons
+    $ .buttons
         eval root.style.width = 350 * ex.buttons.length + 'px'
     drop all: button:not(.vanilla)
     repeat button.vanilla for b in ex.buttons

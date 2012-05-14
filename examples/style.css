@@ -1,0 +1,68 @@
+h1
+{ line-height : 1ex;
+ }
+
+.container
+{ overflow: hidden;
+  display: inline-block;
+}
+
+.box
+{ border: 3px solid orange;
+  border-radius: 10px;
+  padding: 5px;
+  margin: 5px;
+  display: inline-block;
+  float: left;
+}
+
+.buttons
+{ width: 700px;
+  padding: 0;
+  margin-left: auto;
+  margin-right: auto;
+  }
+.buttons button, select
+{ margin: 5px;
+  border-width: 2px;
+  width: 336px;
+  margin: 5px;
+  font-size: large;
+}
+
+.arrow-down
+{
+  display: block;
+  clear: left;
+  margin-left: auto;
+  margin-right: auto;
+  width: 0;
+  height: 0;
+  border-left: 50px solid transparent;
+  border-right: 50px solid transparent;
+  border-top: 30px solid orange;
+}
+
+
+textarea:disabled
+{
+  background-color : white;
+  color: black;
+  border: none;
+}
+
+#result
+{ width: 675px;
+  float: none;
+  display: block;
+  margin-left : auto;
+  margin-right: auto;
+  }
+
+.box.code
+{ width: 675px;
+  display: block;
+  float: none;
+  margin-left : auto;
+  margin-right: auto;
+  }
