@@ -25,6 +25,8 @@
 import sys, re, getopt, os.path, shutil, itertools
 from collections import OrderedDict as odict, deque
 
+VERSION = "0.5.1"
+
 DEFAULT_CONFIG = {
     "lang" : 'js',
     "post_process" : [],
@@ -43,12 +45,13 @@ DEFAULT_CONFIG = {
     "save" : ['ind', 'root'],
     "vars" : ['ind', 'to_drops', 'old'],
     "default_sel_mode" : '?',
-    "output_format" : '%i',
+    "output_format" : '%d%i',
     "default_direction" : '_',
     }
 
 INDENT_COLS = 2
 INDENTS = {' ' : 1, '\t' : 8}
+DEFAULT_CFG_FILE = ".loremrc"
 
 """ OPTIONS """
 
@@ -84,6 +87,9 @@ opt_lookup = {}
 opt_descr = {}
 opt_heading_max = 0
 
+@option('version', None, 'Print the current version, and do nothing', arg=False)
+def print_version(x, cfg) :
+    raise Usage(version=True)
 
 @option('temp-prefix', 't', 'Change the prefix of temporary variables',
         default=DEFAULT_CONFIG['tmp_prefix'])
@@ -169,19 +175,18 @@ def change_default_direction (x, cfg) :
     cfg.default_direction = x
 
 @option('output', 'o', 'Change the output file name '
-        '(use %i for input without extension)',
-        default='%i')
+        '(use %i for input basename without extension, %d for its directory)',
+        default=DEFAULT_CONFIG['output_format'])
 def change_output (x, cfg) :
     cfg.output_format = x
 
 def format_output (cfg) :
-    if cfg.output_format.find('%i') >= 0 :
+    if re.match(r'.*(?:%i|%d)', cfg.output_format) :
         idr, ibs = os.path.split(cfg.input)
         split_ibs = ibs.rsplit('.', 1)
         if len(split_ibs) > 1 :
             ibs = split_ibs[0]
-            ibs = os.path.join(idr, ibs)
-        cfg.output = cfg.output_format.replace('%i', ibs)
+        cfg.output = cfg.output_format.replace('%i', ibs).replace('%d', idr)
     else :
         cfg.output = cfg.output_format
     dr, bs = os.path.split(cfg.output)
@@ -194,7 +199,7 @@ def format_output (cfg) :
 
 @option('post-process', 'e',
         "Add a command to be executed after compilation (use '%c' "
-        "for compiled file)")
+        "for compiled file basename, '%d' for its directory)")
 def change_post_process (x, cfg): cfg.post_process.append(x)
 
 def switch_option(opt, field, x, cfg) :
@@ -276,15 +281,20 @@ def column_str (s, whitespace, max_len=79) :
                         column_str(s[max_len:], whitespace, max_len))
 
 class Usage(Exception) :
-    def __init__(self, msg=None, out=sys.stderr) :
+    def __init__(self, msg=None, out=sys.stderr, version=False) :
+        if version :
+            self.output_msg = 'version ' + VERSION
+            self.out = sys.stdout
+            return
         self.msg = msg
         self.out = out
         self.output_msg = \
-"""
-Usage : %s [OPTIONS] input1 [input2 ...]
+"""%(prog)s, version %(v)s
+
+Usage : %(prog)s [OPTIONS] input1 [input2 ...]
 
 Options ('*' marks ones with argument):
-"""  % os.path.split(prog_name)[1]
+"""  % { 'prog' : os.path.split(prog_name)[1], 'v' : VERSION, }
         for opt, arg_descr in sorted(opt_descr.items()) :
             arg, descr, default = arg_descr
             self.output_msg += ("\n%s %-*s %s\n" %
@@ -1071,7 +1081,8 @@ def compile(cfg) :
     print >>sys.stdout, "Done writing", cfg.output
     os.remove(cfg.tmp_output.name)
     for s in cfg.post_process :
-        s = s.replace('%c', cfg.output)
+        d, c = os.path.split(cfg.output)
+        s = s.replace('%c', c).replace('%d', d)
         print >>sys.stdout, "Calling '%s'" % s
         os.system(s)
 
@@ -1081,6 +1092,10 @@ def main (argv=None):
     prog_name = argv[0]
     main_cfg = Compiler()
     try :
+        try :
+            load_cfg_file(DEFAULT_CFG_FILE, main_cfg)
+        except IOError :
+            pass
         try :
             opts, arg = getopt.getopt(argv[1:], short_opts, long_opts)
         except getopt.error, msg :

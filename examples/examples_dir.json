@@ -1,4 +1,4 @@
-examples = [
+[
     { name : "Choose an example" },
     { name : "Hello world!",
       files : "hello",
@@ -30,4 +30,4 @@ examples = [
       files : "examples_dir",
       buttons : []
     }
-];
+]

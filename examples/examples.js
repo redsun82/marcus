@@ -15,6 +15,9 @@ _slouchers = [];
 _tasks = [];
 _cache = {};
 
+base_path = document.location.pathname
+base_path = base_path.substr(0, base_path.lastIndexOf('/') + 1);
+
 window["manage_task"] = function (task) {
     if (task) {
         var a;
@@ -83,10 +86,8 @@ function get_file_cb (where1, where2, lines) {
 }
 
 window["get_file"] = function (what, where1, where2, lines) {
-    var path = document.location.pathname;
-    path = path.substr(0, path.lastIndexOf('/') + 1) + what;
     manage_task({ method: 'GET',
-                  path: path,
+                  path: base_path + what,
                   hash: what,
                   cb: get_file_cb(where1, where2, lines),
                   error_cb: function() {
@@ -95,18 +96,22 @@ window["get_file"] = function (what, where1, where2, lines) {
                 });
 }
 
-_loaded = { "examples_dir.js" : true };
+_loaded = { "examples_dir.js" : true }
 
 window["load_js"] = function (what) {
     if (_loaded[what]) return;
-    var path = document.location.pathname;
-    path = path.substr(0, path.lastIndexOf('/') + 1) + "compiled-" + what;
     manage_task({ method: 'GET',
-                  path: path,
+                  path: base_path + "compiled-" + what,
                   cb: function (text) {
                       eval(text);
                   }
                 });
 }
 
-load_examples();
+manage_task({ method: 'GET',
+              path: base_path + "examples_dir.json",
+              cb: function (text) {
+                  examples = eval('(' + text + ')');
+                  load_examples();
+              }
+            });
