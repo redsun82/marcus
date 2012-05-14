@@ -1,0 +1,27 @@
+examples = [
+    { name : "Choose an example" },
+    { name : "Hello world!",
+      files : "hello",
+      buttons : [
+          { run : "hello('#result', data)"
+          }
+      ]
+    },
+    { name : "List",
+      files : "loop",
+      buttons : [
+          { one_time : true, run : "load_loop('#result', data)" }
+      ]
+    },
+    { name : "List with append",
+      files : "updating_loop",
+      buttons : [
+          { run : "update_loop('#result', data)" },
+          { run : "reset_loop('#result', data)" }
+      ]
+    },
+    { name : "This example page",
+      files : "example_directive",
+      buttons : []
+    }
+];

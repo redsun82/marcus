@@ -592,7 +592,6 @@ def begin_select(cfg, obj, saves=None) :
             if obj.fail_silently :
                 cfg.send('if (%(root)s) {' % cfg)
                 cfg.indent += 1
-            cfg.send('%(ind)s = %%s;' % cfg % obj.n)
         return frames
 
 def end_select(cfg, frames, obj, saves=None) :
@@ -604,16 +603,9 @@ def end_select(cfg, frames, obj, saves=None) :
 def copy_node(cfg, what, direction) :
     cfg.sends([
             '%(root)s = %%s.cloneNode(true);' % cfg % what,
-            '%%(a)s.parentNode.insertBefore(%(root)s, %%(a)s);' % cfg %
-            {'a' : what},
+            '%%s.parentNode.insertBefore(%(root)s, %%s);' % cfg %
+            (what, what + ('.nextSibling' if direction == '^' else '')),
             ])
-    if direction == '^' :
-        fresh = cfg.fresh()
-        cfg.sends([
-                'var %%s = %(root)s;' % cfg % fresh,
-                '%(root)s = %%s;' % cfg % what,
-                '%s = %%s;' % what % fresh,
-                ])
 
 def drop_root(cfg) :
     cfg.sends([
@@ -782,6 +774,8 @@ class Loop(AST) :
         fresh = cfg.fresh()
         cfg.send('var %s = %s;' % (fresh, self.right))
         pos_frame = save_frame(cfg, 'ind')
+        if self.left :
+            cfg.send('var %s;' % self.left)
         if self.obj : # loop over object properties
             if not self.ind :
                 self.ind = cfg.fresh()
@@ -799,7 +793,7 @@ class Loop(AST) :
             begin_loop(cfg, cfg.ind, fresh)
             if self.left :
                 cfg.send('%%s = %%s[%(ind)s];' % cfg % (self.left, fresh))
-        # now, if repeat clone root
+        # now, if repeat cone root
         if self.rep :
             old_root = save_frame(cfg, 'root')
             copy_node(cfg, old_root, self.dir or cfg.default_direction)
@@ -841,6 +835,7 @@ class If(AST) :
 @statement('COPY', 'copy', 'copy(?P<dir>\^|_)?' +
            selector_regexp % r'\s+' + '?')
 @extend('sel')
+@selector
 @with_body
 class Copy(AST) :
     def istr(self, indent=0) :
@@ -900,18 +895,17 @@ class Definition(AST) :
                  cfg % (self.name, ', '.join(self.args)), 0),
                 ('%(root)s = %(root)s || document;' % cfg, 1),
                 ('var %s;' % ', '.join(cfg[x] for x in cfg.vars), 1),
-                ('%(to_drops)s = new Array();' % cfg, 1),
                 ('if (typeof(%(root)s) == "string") {' % cfg, 1),
                 ('%(root)s = %%s;' % cfg %
                  cfg.selector_all('document', cfg.root), 2),
-                ('for (%(ind)s = 0; %(ind)s < %(root)s.length; %(ind)s++) {' %
-                 cfg, 2),
-                ('%%s(%(root)s[%(ind)s], %%s);' % cfg %
-                 (self.name, ', '.join(self.args[1:])), 3),
-                ('}', 2),
-                ('return;', 2),
-                ('}', 1),
                 ])
+        begin_loop(cfg, cfg.ind, cfg.root)
+        self.args[0] = '%(root)s[%(ind)s]' % cfg
+        cfg.send('%s(%s);' % (self.name, ', '.join(self.args)))
+        end_block(cfg)
+        cfg.send('return;')
+        end_block(cfg)
+        cfg.send('%(to_drops)s = new Array();' % cfg)
         self.body.js_compile(cfg)
         # erase nodes marked for dropping
         begin_loop(cfg, cfg.ind, cfg.to_drops)
@@ -926,7 +920,7 @@ class Definition(AST) :
         cfg.root = old_root
 
 
-@statement('EVAL', 'native eval', r'\\\s+(?P<right>.*)')
+@statement('EVAL', 'native eval', r'eval\s+(?P<right>.*)')
 @extend('right')
 class Eval(AST) :
     def istr(self, indent=0) :
@@ -991,7 +985,7 @@ def tokenize (cfg) :
                 yield Token('DEDENT', line=ln_no)
             indents.append(col)
         continuing = continue_re.match(l, i)
-        if continuing : l, i = m.group('s'), 0
+        if continuing : l, i = continuing.group('s'), 0
         m = None
         for t, r in token_regexp.items() :
             m = r.match(l, i)
@@ -1065,8 +1059,9 @@ def compile(cfg) :
             for line, err in cfg.errors :
                 print >>sys.stderr, str(line) + ':', err
             cfg.end_compilation()
-            return 2
-        ast.compile(cfg)
+            cfg.compilation_failed = True
+        else :
+            ast.compile(cfg)
     finally :
         cfg.end_compilation()
     shutil.copy(cfg.tmp_output.name, cfg.output)
@@ -1076,26 +1071,30 @@ def compile(cfg) :
         s = s.replace('%c', cfg.output)
         print >>sys.stdout, "Calling '%s'" % s
         os.system(s)
-    return 0
 
 def main (argv=None):
     global prog_name
     argv = argv or sys.argv
     prog_name = argv[0]
-    cfg = Compiler()
+    main_cfg = Compiler()
     try :
         try :
             opts, arg = getopt.getopt(argv[1:], short_opts, long_opts)
         except getopt.error, msg :
             raise Usage(msg)
         for opt, opt_arg in opts :
-            opt_lookup[opt](opt_arg, cfg)
+            opt_lookup[opt](opt_arg, main_cfg)
         if not arg : raise Usage("You must provide at least an input.")
-        for cfg.input in arg :
-            print >>sys.stdout, "Compiling", cfg.input
-            n = compile(cfg)
-            if n != 0 : return n
-        return 0
+        for i in arg :
+            # create a new Compiler object each time to avoid carrying
+            # over in-file options from one input to the other
+            cfg = Compiler(**main_cfg.__dict__)
+            cfg.input = i
+            print >>sys.stdout, "Compiling", i
+            compile(cfg)
+            compilation_failed = cfg.compilation_failed
+            del cfg
+        return 2 if compilation_failed else 0
     except Usage, err :
         print >>err.out, err.output_msg
         return 2

@@ -1,0 +1,53 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-15">
+    <link type="text/css" rel="stylesheet" href="style.css"/>
+    <title>Marcus examples</title>
+    <style type="text/css">
+      .vanilla { display: none }
+    </style>
+  </head>
+
+  <body>
+    <form action="javascript:;">
+      <select
+         onchange="if (this.value) load_example(null, examples[this.value]);">
+        <option value="0">Choose an example</option>
+      </select>
+    </form>
+    <div class="container">
+      <div class="box">
+        <div class="box">
+          <h1>The html code</h1>
+          <textarea id="html_code" cols="80" disabled="true"></textarea>
+        </div>
+        <div class="box">
+          <h1>The data</h1>
+          data = <br/>
+          <textarea id="data" cols="80" rows="8"></textarea>
+        </div>
+      </div>
+      <div class="arrow-down"></div>
+      <div class="box code">
+        <h1>The marcus code</h1>
+        <textarea cols="80" disabled="true"></textarea>
+      </div>
+      <div class="arrow-down"></div>
+      <div class="buttons">
+        <button class="vanilla" onclick="data = eval(data_field.value); ">
+          Run <code></code>
+        </button>
+      </div>
+      <div class="arrow-down"></div>
+      <div id="result" class="box">
+        <h1>The result</h1>
+        <div>
+        </div>
+      </div>
+    </div>
+  </body>
+  <script type="text/javascript" src="example_directive.json"></script>
+  <script type="text/javascript" src="example_directive.js"></script>
+  <script type="text/javascript" src="examples.js"></script>
+</html>

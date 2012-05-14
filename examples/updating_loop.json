@@ -1,0 +1,7 @@
+[{ name: "Mario Rossi", page_name: "L'Antro del Rosso",
+   page: "antro_rosso"},
+ { name: "Mark Smith", page_name: "A Smith",
+   page: "smith"},
+ { name: "Marcus Tullius Cicero", page_name: "Angulus Consulis",
+   page: "angulus"}
+]

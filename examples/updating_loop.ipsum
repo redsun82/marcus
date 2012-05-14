@@ -1,0 +1,16 @@
+def reset_loop(root)
+    ## drop non-vanilla items
+    drop all: li:not(.vanilla)
+    .how_many := "0"
+    ul/class := "vanilla"
+
+def update_loop(root, data)
+    repeat li.vanilla for p in data
+        span := p.name
+        a/href := old + p.page
+        a := p.page_name
+        /class := ""
+    ## keep the copied node for future changes
+    keep li.vanilla
+    .how_many := parseInt(old) + data.length
+    ul/class := !old || data.length ? "" : "vanilla"

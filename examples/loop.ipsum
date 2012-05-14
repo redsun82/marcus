@@ -1,0 +1,7 @@
+def load_loop(root, data)
+    repeat li for p in data
+        span := p.name
+        a/href := old + p.page
+        a := p.page_name
+    .how_many := data.length
+    ul/class := data.length ? "" : "vanilla"
