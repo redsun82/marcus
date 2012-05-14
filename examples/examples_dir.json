@@ -14,10 +14,16 @@ examples = [
       ]
     },
     { name : "List with append",
-      files : "updating_loop",
+      files : "loop_append",
       buttons : [
-          { run : "update_loop('#result', data)" },
+          { run : "append_loop('#result', data)" },
           { run : "reset_loop('#result', data)" }
+      ]
+    },
+    { name : "List with update",
+      files : "loop_update",
+      buttons : [
+          { run : "update_loop('#result', data)" }
       ]
     },
     { name : "This example page",

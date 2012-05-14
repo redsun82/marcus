@@ -4,7 +4,7 @@ def reset_loop(root)
     .how_many := "0"
     ul/class := "vanilla"
 
-def update_loop(root, data)
+def append_loop(root, data)
     repeat li.vanilla for p in data
         span := p.name
         a/href := old + p.page

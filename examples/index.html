@@ -11,8 +11,7 @@
 
   <body>
     <form action="javascript:;">
-      <select
-         onchange="if (this.value) load_example(null, examples[this.value]);">
+      <select id="select">
         <option value="0">Choose an example</option>
       </select>
     </form>
@@ -25,7 +24,7 @@
         <div class="box">
           <h1>The data</h1>
           data = <br/>
-          <textarea id="data" cols="80" rows="8"></textarea>
+          <form id="data_form"><textarea cols="80" rows="10"></textarea></form>
         </div>
       </div>
       <div class="arrow-down"></div>
@@ -35,7 +34,9 @@
       </div>
       <div class="arrow-down"></div>
       <div class="buttons">
-        <button class="vanilla" onclick="data = eval(data_field.value); ">
+        <button
+           class="vanilla"
+           onclick="data = eval('(' + data_field.value + ')'); ">
           Run <code></code>
         </button>
       </div>
@@ -49,5 +50,5 @@
   </body>
   <script type="text/javascript" src="examples_dir.json"></script>
   <script type="text/javascript" src="examples_dir.js"></script>
-  <script type="text/javascript" src="examples.js"></script>
+  <script type="text/javascript" src="compiled-examples.js"></script>
 </html>

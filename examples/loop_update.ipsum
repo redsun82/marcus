@@ -1,0 +1,32 @@
+eval base_url = "http://example.com/"
+
+def update_user(root, u)
+    if u.name
+        span := u.name
+    if u.page
+        a/href := base_url + u.page
+        a := u.page_name || u.page
+    else
+        if u.page_name
+            a := u.page_name
+    /class := ""
+
+def update_loop(root, data)
+    select .how_many
+        eval var n = parseInt(root.innerHTML)
+    ## remove (as drop works at the end, selection works as expected)
+    ## :not(vanilla) is to be sure not to erase the generating li
+    for i in data.rm
+        select li:nth-child({i}):not(.vanilla)
+            eval n--
+            drop
+    ## update
+    for i : u in data.up
+        select li:nth-child({i}):not(.vanilla)
+            eval update_user(root, u)
+    ## new
+    for u in data.nw
+        copy li.vanilla
+            eval n++; update_user(root, u)
+    .how_many := n
+    ul/class := n ? "" : "vanilla"

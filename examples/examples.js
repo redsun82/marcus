@@ -1,5 +1,3 @@
-data_field = document.getElementById('data');
-
 // xmlhttp handling
 MAX_WORKERS = 4
 
@@ -17,7 +15,7 @@ _slouchers = [];
 _tasks = [];
 _cache = {};
 
-function manage_task (task) {
+window["manage_task"] = function (task) {
     if (task) {
         var a;
         if (task.hash) {
@@ -40,17 +38,17 @@ function manage_task (task) {
         }
         worker.open(task.method, task.path, true);
         worker.onreadystatechange = function () {
-            if (this.readyState == 4) {
-                if (this.status != 200) {
-                    if (task.error_cb) { task.error_cb(this); }
+            if (worker.readyState == 4) {
+                if (worker.status != 200) {
+                    if (task.error_cb) { task.error_cb(worker); }
                 } else {
                     if (task.hash) {
-                        _cache[task.hash] = this.responseText;
+                        _cache[task.hash] = worker.responseText;
                     }
-                    task.cb(this.responseText);
+                    task.cb(worker.responseText);
                 }
-                this.abort();
-                _slouchers.push(this);
+                worker.abort();
+                _slouchers.push(worker);
                 manage_task();
             }
         };
@@ -58,7 +56,7 @@ function manage_task (task) {
     }
 }
 
-function abort_all () {
+window["abort_all"] = function () {
     for (var i = 0; i < _workers.length; i++) {
         _workers[i].abort();
     }
@@ -84,7 +82,7 @@ function get_file_cb (where1, where2, lines) {
     };
 }
 
-function get_file(what, where1, where2, lines) {
+window["get_file"] = function (what, where1, where2, lines) {
     var path = document.location.pathname;
     path = path.substr(0, path.lastIndexOf('/') + 1) + what;
     manage_task({ method: 'GET',
@@ -99,10 +97,10 @@ function get_file(what, where1, where2, lines) {
 
 _loaded = { "examples_dir.js" : true };
 
-function load_js(what) {
+window["load_js"] = function (what) {
     if (_loaded[what]) return;
     var path = document.location.pathname;
-    path = path.substr(0, path.lastIndexOf('/') + 1) + what;
+    path = path.substr(0, path.lastIndexOf('/') + 1) + "compiled-" + what;
     manage_task({ method: 'GET',
                   path: path,
                   cb: function (text) {

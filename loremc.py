@@ -773,7 +773,9 @@ class Loop(AST) :
 
     def js_compile (self, cfg) :
         fresh = cfg.fresh()
-        cfg.send('var %s = %s;' % (fresh, self.right))
+        # make it do nothing in case of undefined
+        cfg.send('var %s = %s%s;' % (fresh, self.right,
+                                     ' || {}' if self.obj else ' || []'))
         pos_frame = save_frame(cfg, 'ind')
         if self.left :
             cfg.send('var %s;' % self.left)

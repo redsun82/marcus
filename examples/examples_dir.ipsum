@@ -3,30 +3,39 @@
 ##--weak-parsing 1
 
 def load_examples()
-    $ select option
-        repeat for ex in examples
-            /value := pos ? pos : ""
-            := ex.name
-        drop
+    $ #data_form
+        data_form = root
+        $ #data
+            data_field = root
+    $ select
+        /onchange := "load_example(null, parseInt(this.value));"
+        $ option
+            repeat for ex in examples
+                /value := pos ? pos : ""
+                := ex.name
+            drop
 
 
-def load_example(root, ex)
-    $ #result > div
-        var html = root
-    $ #html_code
-        get_file(ex.files + '.html', root, html, 'rows')
-    $ .box.code textarea
-        get_file(ex.files + '.ipsum', root, null, 'rows')
-    $ #data
-        get_file(ex.files + '.json', root)
-    load_js(ex.files + '.js')
-    title := ex.name
-    $ .buttons
-        eval root.style.width = 350 * ex.buttons.length + 'px'
-    drop all: button:not(.vanilla)
-    repeat button.vanilla for b in ex.buttons
-        /class := ""
-        /onclick := old + b.run
-        if b.one_time
-            /onclick := old + '; this.disabled = true'
-        := old + b.run
+def load_example(root, i)
+    if i
+        var ex = examples[i]
+        data_form.reset()
+        $ #result > div
+            var html = root
+        $ #html_code
+            get_file(ex.files + '.html', root, html, 'rows')
+        $ .box.code textarea
+            get_file(ex.files + '.ipsum', root, null, 'rows')
+        $ #data_form textarea
+            get_file(ex.files + '.json', root)
+        load_js(ex.files + '.js')
+        title := ex.name
+        $ .buttons
+            eval root.style.width = 350 * ex.buttons.length + 'px'
+        drop all: button:not(.vanilla)
+        repeat button.vanilla for b in ex.buttons
+            /class := ""
+            /onclick := old + b.run
+            if b.one_time
+                /onclick := old + '; this.disabled = true'
+            := old + b.run
