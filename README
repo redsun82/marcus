@@ -1,3 +1,4 @@
+loremc, version 0.5.1
 
 Usage : loremc [OPTIONS] input1 [input2 ...]
 
@@ -12,6 +13,10 @@ Options ('*' marks ones with argument):
                               defined.
                               Default: window
 
+* --copy-direction            Change the default direction of copy and repeat
+                              statements (^ or _).
+                              Default: _
+
 * --default-root, -r          Change the default root variable.
                               Default: root
 
@@ -19,6 +24,10 @@ Options ('*' marks ones with argument):
 
 * --index-var, -i             Change the position variable.
                               Default: pos
+
+* --keep-repeated             With 1, always keep copied node after repeat
+                              loops. With 0 the copied node is dropeed.
+                              Default: 0
 
 * --lazy-parsing, -l          Enable (1) or disable (0) lazy parsing (stop at
                               first error).
@@ -31,11 +40,13 @@ Options ('*' marks ones with argument):
                               Default: old
 
 * --output, -o                Change the output file name (use %i for input
-                              without extension).
-                              Default: %i
+                              basename without extension, %d for its
+                              directory).
+                              Default: %d%i
 
 * --post-process, -e          Add a command to be executed after compilation
-                              (use '%c' for compiled file).
+                              (use '%c' for compiled file basename, '%d' for
+                              its directory).
 
 * --preamble-append, -p       Append a line to the preamble.
 
@@ -51,12 +62,16 @@ Options ('*' marks ones with argument):
 
 * --query-selector, -q        Change the selector macro (use %r for root, %s
                               for selector.
+                              Default: %r.querySelector(%s)
+
+* --query-selector-all, -Q    Change the selector all macro (use %r for root,
+                              %s for selector.
                               Default: %r.querySelectorAll(%s)
 
   --reset-cfg, -E             Forget all options.
 
 * --selection-mode, -s        Choose the default selection mode.
-                              Default: @
+                              Default: ?
 
 * --temp-prefix, -t           Change the prefix of temporary variables.
                               Default: _tmp
@@ -67,6 +82,8 @@ Options ('*' marks ones with argument):
 
 * --to-drop-field             Change the field name used for marking removal.
                               Default: _lorem_drop
+
+  --version                   Print the current version, and do nothing.
 
 * --weak-parsing, -w          Enable (1) or disable (0) weak parsing, where
                               unrecognized lines are directly passed to
