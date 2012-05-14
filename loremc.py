@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 # Copyright (c) 2012 Paolo Tranquilli
 
@@ -460,7 +461,7 @@ with_else = []
 def register_token(typ, name, regexp=None, clss=None) :
     if regexp :
         regexp += r'\s*$'
-        token_regexp[typ] = re.compile(regexp)
+        token_regexp[typ] = re.compile(regexp, )
     if clss :
         token_class[typ] = clss
         clss.typ = typ
@@ -622,7 +623,7 @@ def selector_str (obj) :
 sel_mod_regexp = r'(?:(?:[0-9]+|\{.*?\})\??|all|\?)'
 # selector_regex expects formatting giving the beginning of the regexp
 selector_regexp = r'(?:%%s(?:(?P<n>%s):\s*)?(?P<sel>\S.*?))' % sel_mod_regexp
-
+dir_regexp = r'(?P<dir>\^|_|↑|↓)?'
 
 """ DECORATORS """
 
@@ -753,7 +754,7 @@ class Select(AST) :
         self.body.js_compile(cfg)
 
 @statement('FOR', 'for loop',
-           r'(?:(?P<rep>r)epeat(?P<dir>\^|_)?\s+(?:' +
+           r'(?:(?P<rep>r)epeat' + dir_regexp + r'\s+(?:' +
            selector_regexp % '' + r'\s+)?)?' +
            r'for\s+(?:(?:(?P<ind>\w+)?\s*(?P<obj>:)\s*)?(?P<left>\w+)?\s+)?' +
            r'in\s+(?P<right>.*)')
@@ -832,7 +833,7 @@ class If(AST) :
             self.else_body.js_compile(cfg)
         end_block(cfg)
 
-@statement('COPY', 'copy', 'copy(?P<dir>\^|_)?' +
+@statement('COPY', 'copy', 'copy' + dir_regexp +
            selector_regexp % r'\s+' + '?')
 @extend('sel')
 @selector
