@@ -16,6 +16,7 @@ def update_loop(root, data)
         eval var n = parseInt(root.innerHTML)
     ## remove (as drop works at the end, selection works as expected)
     ## :not(vanilla) is to be sure not to erase the generating li
+    ## notice n-- will be executed only if dropped li exists
     for i in data.rm
         select li:nth-child({i}):not(.vanilla)
             eval n--
