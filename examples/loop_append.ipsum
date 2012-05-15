@@ -1,6 +1,6 @@
 def reset_loop(root)
     ## drop non-vanilla items
-    drop all: li:not(.vanilla)
+    drop|all li:not(.vanilla)
     .how_many := "0"
     ul/class := "vanilla"
 

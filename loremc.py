@@ -317,6 +317,7 @@ class Compiler :
         self.__dict__.update(kargs)
         self.open_files = []
         self.errors = []
+        self.warnings = []
 
     def __getitem__(self, item) :
         return self.__dict__[item]
@@ -388,6 +389,10 @@ class Compiler :
         if self.lazy_parsing :
             raise LoremSyntaxError(line=line, err=err)
         self.errors.append((line, err))
+
+    def warning(self, line, warn) :
+        print >>sys.stderr, "Warning", "%d:" % line, warn
+        self.warnings.append((line, warn))
 
 
 class Token :
@@ -569,9 +574,10 @@ def begin_loop(cfg, var, what, start='0', end='%(what)s.length') :
              % (start, end) % {'var' : var, 'what' : what})
     cfg.indent += 1
 
-def end_block(cfg) :
-    cfg.indent -= 1
-    cfg.send('}')
+def end_block(cfg, blocks=1) :
+    for _ in xrange(blocks) :
+        cfg.indent -= 1
+        cfg.send('}')
 
 def begin_select(cfg, obj, saves=None) :
     if obj.sel :
@@ -618,11 +624,14 @@ def copy_node(cfg, what, direction) :
             (what, what + ('.nextSibling' if direction == '^' else '')),
             ])
 
-def drop_root(cfg) :
-    cfg.sends([
-            '%(root)s.%(to_drop)s = true;' % cfg,
-            '%(to_drops)s.push(%(root)s);' % cfg,
-            ])
+def drop_root(cfg, now=False) :
+    if now :
+        cfg.send('%(root)s.parentNode.removeChild(%(root)s);' % cfg)
+    else :
+        cfg.sends([
+                '%(root)s.%(to_drop)s = true;' % cfg,
+                '%(to_drops)s.push(%(root)s);' % cfg,
+                ])
 
 def selector_str (obj) :
     if obj.sel :
@@ -632,7 +641,8 @@ def selector_str (obj) :
 
 sel_mod_regexp = r'(?:(?:[0-9]+|\{.*?\})\??|all|\?)'
 # selector_regex expects formatting giving the beginning of the regexp
-selector_regexp = r'(?:%%s(?:(?P<n>%s):\s*)?(?P<sel>\S.*?))' % sel_mod_regexp
+selector_regexp = r'(?:(?:\|\s*(?P<n>%s)\s+|%%s)(?P<sel>\S.*?))' %\
+                                                                  sel_mod_regexp
 dir_regexp = r'(?P<dir>\^|_|↑|↓)?'
 
 """ DECORATORS """
@@ -699,7 +709,8 @@ class Error(AST) :
     def js_compile(self, cfg) :
         raise ValueError
 
-@statement('DROP', 'drop', 'drop' + selector_regexp % r'\s+' + '?')
+@statement('DROP', 'drop',
+           'drop(?:\|\s*(?P<now>n)ow)?' + selector_regexp % r'\s+' + '?')
 @extend('sel')
 @selector
 class Drop(AST) :
@@ -707,7 +718,7 @@ class Drop(AST) :
         return istr('drop ' + selector_str(self), indent)
 
     def js_compile(self, cfg) :
-        drop_root(cfg)
+        drop_root(cfg, self.now)
 
 @statement('KEEP', 'keep', 'keep' + selector_regexp % r'\s+' + '?')
 @extend('sel')
@@ -922,14 +933,13 @@ class Definition(AST) :
         self.body.js_compile(cfg)
         # erase nodes marked for dropping
         begin_loop(cfg, cfg.ind, cfg.to_drops)
-        cfg.sends_ind([
-                ('%(root)s = %(to_drops)s[%(ind)s];' % cfg, 0),
-                ('if (%(root)s && %(root)s.%(to_drop)s) {' % cfg, 0),
-                ('%(root)s.parentNode.removeChild(%(root)s);' % cfg, 1),
-                ('}', 0),
+        cfg.sends([
+                '%(root)s = %(to_drops)s[%(ind)s];' % cfg,
+                'if (%(root)s && %(root)s.%(to_drop)s) {' % cfg,
                 ])
-        end_block(cfg)
-        end_block(cfg)
+        cfg.indent += 1
+        drop_root(cfg, now=True)
+        end_block(cfg, blocks=3)
         cfg.root = old_root
 
 
@@ -1007,6 +1017,9 @@ def tokenize (cfg) :
                 break
         if not m :
             if cfg.weak_parsing :
+                cfg.warning(line=ln_no,
+                            warn=("'%s' unrecognized and passed as %s" %
+                                  (l[i:].strip(), token_names['EVAL'])))
                 yield Token('EVAL', line=ln_no, right=l[i:])
             else :
                 cfg.syntax_error(line=ln_no,
@@ -1073,6 +1086,7 @@ def compile(cfg) :
                 print >>sys.stderr, str(line) + ':', err
             cfg.end_compilation()
             cfg.compilation_failed = True
+            return
         else :
             ast.compile(cfg)
     finally :
