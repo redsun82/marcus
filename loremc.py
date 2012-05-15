@@ -737,7 +737,7 @@ class Pass(AST) :
         return istr('pass', indent)
 
 @statement('DOMASS', 'DOM assignment', selector_regexp % '' +
-       r'??(?:\s*/\s*(?P<attr>\S+))?\s*:=(?P<right>.*)')
+       r'??(?:\s*/\s*(?P<attr>(?:\{.*?\}|\S)+))?\s*:=(?P<right>.*)')
 @extend('right')
 @selector
 class DomAssign(AST) :
