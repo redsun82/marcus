@@ -123,6 +123,13 @@ def change_query_selector_all (x, cfg) :
     x = x.replace('%s', '%(s)s')
     cfg.selector_all = (lambda r, s : x % {'r' : r, 's' : s})
 
+@option('sizzle', None, 'Use sizzle library for selecting', arg=False)
+def use_sizzle(x, cfg) :
+    cfg.selector_one = (lambda r, s:
+                            'Sizzle(%(s)s, %(r)s)[0]' % {'r' : r, 's' : s})
+    cfg.selector_all = (lambda r, s:
+                            'Sizzle(%(s)s, %(r)s)' % {'r' : r, 's' : s})
+
 @option('preamble-from-file', 'F',
         'Load preamble from file, replacing the default')
 def preamble_from_file (x, cfg) : cfg.preamble = cfg.open(x)
@@ -254,7 +261,7 @@ def set_closure_ready (x, cfg):
 
 @option('keep-repeated', None,
         "With 1, always keep copied node after repeat loops. With 0 "
-        "the copied node is dropeed", default='0')
+        "the copied node is dropped", default='0')
 def set_keep_repeated (x, cfg):
     switch_option('keep-repeated', 'keep_repeated', x, cfg)
 

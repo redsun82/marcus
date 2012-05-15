@@ -26,7 +26,7 @@ Options ('*' marks ones with argument):
                               Default: pos
 
 * --keep-repeated             With 1, always keep copied node after repeat
-                              loops. With 0 the copied node is dropeed.
+                              loops. With 0 the copied node is dropped.
                               Default: 0
 
 * --lazy-parsing, -l          Enable (1) or disable (0) lazy parsing (stop at
@@ -72,6 +72,8 @@ Options ('*' marks ones with argument):
 
 * --selection-mode, -s        Choose the default selection mode.
                               Default: ?
+
+  --sizzle                    Use sizzle library for selecting.
 
 * --temp-prefix, -t           Change the prefix of temporary variables.
                               Default: _tmp

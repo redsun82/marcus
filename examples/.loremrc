@@ -1,0 +1,3 @@
+--closure-ready 1
+--sizzle
+-e java -jar ../compiler.jar --js %d%c --js_output_file %dcompiled-%c --compilation_level ADVANCED_OPTIMIZATIONS --formatting pretty_print

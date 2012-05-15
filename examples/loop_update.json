@@ -1,8 +1,8 @@
 {
     rm : [1],
     up : {
-        "1" : {name : "Mark T. Smith"},
-        "3" : {page_name : "Angulus Patris Patriae"}
+        2 : {name : "Mark T. Smith"},
+        3 : {page_name : "Angulus Patris Patriae"}
     },
     nw : [
         { name: "Maria Bianchi", page: "maria_bianchi" },
