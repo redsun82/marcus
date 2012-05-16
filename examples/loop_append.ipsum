@@ -5,12 +5,11 @@ def reset_loop(root)
     ul/class := "vanilla"
 
 def append_loop(root, data)
-    repeat li.vanilla for p in data
+    ## keep the copied node for future changes
+    repeat|keep li.vanilla for p in data
         span := p.name
         a/href := old + p.page
         a := p.page_name
         /class := ""
-    ## keep the copied node for future changes
-    keep li.vanilla
     .how_many := parseInt(old) + data.length
     ul/class := !old || data.length ? "" : "vanilla"

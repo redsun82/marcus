@@ -1,4 +1,4 @@
-loremc, version 0.5.1
+loremc, version 0.6.1
 
 Usage : loremc [OPTIONS] input1 [input2 ...]
 
@@ -14,8 +14,8 @@ Options ('*' marks ones with argument):
                               Default: window
 
 * --copy-direction            Change the default direction of copy and repeat
-                              statements (^ or _).
-                              Default: _
+                              statements (up, down, ↑ or ↓).
+                              Default: down
 
 * --default-root, -r          Change the default root variable.
                               Default: root

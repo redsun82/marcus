@@ -30,11 +30,10 @@ def load_example(root, i)
     title := ex.name
     $ .buttons
         eval root.style.width = 350 * ex.buttons.length + 'px'
-    drop|now|all button:not(.vanilla)
-    repeat button.vanilla for b in ex.buttons
+    drop|all|now button:not(.vanilla)
+    repeat|keep button.vanilla for b in ex.buttons
         /class := ""
         /onclick := old + b.run
         if b.one_time
             /onclick := old + '; this.disabled = true'
         := old + b.run
-    keep button.vanilla

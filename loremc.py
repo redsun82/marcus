@@ -25,7 +25,7 @@
 import sys, re, getopt, os.path, shutil, itertools
 from collections import OrderedDict as odict, deque
 
-VERSION = "0.5.1"
+VERSION = "0.6.1"
 
 DEFAULT_CONFIG = {
     "lang" : 'js',
@@ -46,7 +46,7 @@ DEFAULT_CONFIG = {
     "vars" : ['ind', 'to_drops', 'old'],
     "default_sel_mode" : '?',
     "output_format" : '%d%i',
-    "default_direction" : '_',
+    "default_dir" : 'down',
     }
 
 INDENT_COLS = 2
@@ -175,11 +175,13 @@ def change_to_drop_array (x, cfg) : cfg.to_drops = x
 def change_container (x, cfg) : cfg.container = x
 
 @option('copy-direction', None,
-        'Change the default direction of copy and repeat statements (^ or _)',
-        default=DEFAULT_CONFIG['default_direction'])
+        'Change the default direction of copy and repeat statements '
+        '(up, down, ↑ or ↓)',
+        default=DEFAULT_CONFIG['default_dir'])
 def change_default_direction (x, cfg) :
-    if x not in ['^', '_'] : raise Usage("Copy direction must be '^' or '_'")
-    cfg.default_direction = x
+    if not re.match(dir_regexp + '$', x) :
+        raise Usage("Copy direction must match " + dir_regexp)
+    cfg.default_dir = x
 
 @option('output', 'o', 'Change the output file name '
         '(use %i for input basename without extension, %d for its directory)',
@@ -627,8 +629,14 @@ def end_select(cfg, frames, obj, saves=None) :
 def copy_node(cfg, what, direction) :
     cfg.sends([
             '%(root)s = %%s.cloneNode(true);' % cfg % what,
-            '%%s.parentNode.insertBefore(%(root)s, %%s);' % cfg %
-            (what, what + ('.nextSibling' if direction == '^' else '')),
+            ('%%(what)s.parentNode.insertBefore(%(root)s, %%(what)s%%(' +
+             direction + ')s);') % cfg %
+            { 'what' : what,
+              'down' : '',
+              '↓' : '',
+              'up' : '.nextSibling',
+              '↑' : '.nextSibling',
+              },
             ])
 
 def drop_root(cfg, now=False) :
@@ -646,11 +654,10 @@ def selector_str (obj) :
     else : return ''
 
 
-sel_mod_regexp = r'(?:(?:[0-9]+|\{.*?\})\??|all|\?)'
 # selector_regex expects formatting giving the beginning of the regexp
-selector_regexp = r'(?:(?:\|\s*(?P<n>%s)\s+|%%s)(?P<sel>\S.*?))' %\
-                                                                  sel_mod_regexp
-dir_regexp = r'(?P<dir>\^|_|↑|↓)?'
+selector_regexp = r'(?:%s(?P<sel>\S.*?))'
+dir_regexp = r'up|↑|down|↓'
+sel_mod_regexp = r'all|[0-9]*\??|\{.*?\}\??'
 
 """ DECORATORS """
 
@@ -661,7 +668,6 @@ class statement :
         self.name = name
         self.regexp = regexp
     def __call__ (self, c) :
-        register_token(self.typ, self.name, self.regexp, c)
         # on compile, output token line and token name as comment
         c.js_compile = add_stmt_header(c.js_compile)
         if c._with_body :
@@ -670,6 +676,13 @@ class statement :
         if c._with_else_body :
             c.istr = add_istr_else_body(c.istr)
             with_else.append(self.typ)
+        try :
+            mod_regexp = '(?:\|(?:%s))*'
+            mod_regexp %= '|'.join(r'(?P<%s>%s)' % p for p in c.mods.items())
+        except AttributeError :
+            mod_regexp = ''
+        if self.regexp : self.regexp %= {'mods' : mod_regexp}
+        register_token(self.typ, self.name, self.regexp, c)
         return c
 
 """ decorator that adds a body to AST nodes spec """
@@ -684,10 +697,11 @@ def with_else_body(c) :
     return c
 
 """ decorator that makes the AST node a selector """
+""" selectors always have selector mods as modifiers """
 def selector(c) :
     c.__init__ = make_selector_init(c.__init__)
     c.js_compile = make_js_selector(c.js_compile)
-    return c
+    return mods(n = sel_mod_regexp)(c)
 
 """ decorator which tells what field to continue with extended lines """
 class extend :
@@ -697,6 +711,17 @@ class extend :
         def cont (obj, s) :
             obj.__dict__[self.field] += ' ' + s;
         c.cont = cont
+        return c
+
+""" decorator which adds command modifiers in keyword args mode """
+class mods :
+    def __init__(self, **kargs) :
+        self.mods = kargs
+    def __call__(self, c) :
+        try :
+            c.mods.update(self.mods)
+        except AttributeError :
+            c.mods = self.mods
         return c
 
 """ TOKENS AND AST NODES """
@@ -717,7 +742,8 @@ class Error(AST) :
         raise ValueError
 
 @statement('DROP', 'drop',
-           'drop(?:\|\s*(?P<now>n)ow)?' + selector_regexp % r'\s+' + '?')
+           'drop%(mods)s' + selector_regexp % r'\s+' + '?')
+@mods(now = 'now')
 @extend('sel')
 @selector
 class Drop(AST) :
@@ -743,8 +769,9 @@ class Pass(AST) :
     def istr(self, indent=0) :
         return istr('pass', indent)
 
-@statement('DOMASS', 'DOM assignment', selector_regexp % '' +
-       r'??(?:\s*/\s*(?P<attr>(?:\{.*?\}|\S)+))?\s*:=(?P<right>.*)')
+@statement('DOMASS', 'DOM assignment',
+           '%(mods)s' + selector_regexp % r'\s*(?<!\S)' +
+           r'??(?:\s*/\s*(?P<attr>(?:\{.*?\}|\S)+))?\s*:=(?P<right>.*)')
 @extend('right')
 @selector
 class DomAssign(AST) :
@@ -770,7 +797,8 @@ class DomAssign(AST) :
                     ])
 
 
-@statement('SELECT', 'select', '(?:select|\$)' + selector_regexp % r'\s+')
+@statement('SELECT', 'select', '(?:select|\$)%(mods)s' +
+           selector_regexp % r'\s+')
 @extend('sel')
 @selector
 @with_body
@@ -782,11 +810,12 @@ class Select(AST) :
         self.body.js_compile(cfg)
 
 @statement('FOR', 'for loop',
-           r'(?:(?P<rep>r)epeat' + dir_regexp + r'\s+(?:' +
-           selector_regexp % '' + r'\s+)?)?' +
+           r'(?:(?P<rep>r)epeat%(mods)s' + selector_regexp % r'\s+' +
+           r'\s+)?' +
            r'for\s+(?:(?:(?P<ind>\w+)?\s*(?P<obj>:)\s*)?(?P<left>\w+)?\s+)?' +
            r'in\s+(?P<right>.*)')
 @extend('right')
+@mods(dir = dir_regexp, keep = 'keep|drop')
 @selector
 @with_else_body
 class Loop(AST) :
@@ -827,7 +856,7 @@ class Loop(AST) :
         # now, if repeat cone root
         if self.rep :
             old_root = save_frame(cfg, 'root')
-            copy_node(cfg, old_root, self.dir or cfg.default_direction)
+            copy_node(cfg, old_root, self.dir or cfg.default_dir)
         # insert looping body
         self.body.js_compile(cfg)
         # now undo what it is to be undone
@@ -835,7 +864,8 @@ class Loop(AST) :
         end_block(cfg)
         if self.obj : end_block(cfg)
         # if repeating, mark root for erasure
-        if self.rep and not cfg.keep_repeated : drop_root(cfg)
+        discard = self.keep == 'drop' if self.keep else not cfg.keep_repeated
+        if self.rep and discard : drop_root(cfg)
         # process else body, based on pos
         if self.else_body :
             cfg.send('if (!%(ind)s) {' % cfg)
@@ -863,8 +893,8 @@ class If(AST) :
             self.else_body.js_compile(cfg)
         end_block(cfg)
 
-@statement('COPY', 'copy', 'copy' + dir_regexp +
-           selector_regexp % r'\s+' + '?')
+@statement('COPY', 'copy', 'copy%(mods)s' + selector_regexp % r'\s+' + '?')
+@mods(dir = dir_regexp)
 @extend('sel')
 @selector
 @with_body
@@ -873,7 +903,7 @@ class Copy(AST) :
         return istr('copy ' + selector_str(self), indent)
     def js_compile (self, cfg, indent=0) :
         old_root = save_frame(cfg, 'root')
-        copy_node(cfg, old_root, self.dir or cfg.default_direction)
+        copy_node(cfg, old_root, self.dir or cfg.default_dir)
         self.body.js_compile(cfg)
         # no need to recover root, already done by decorator
 
